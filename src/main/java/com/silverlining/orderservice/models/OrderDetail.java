@@ -8,7 +8,7 @@ public class OrderDetail {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    String id;
+    int id;
 
     @OneToMany
     @JoinColumn(name = "orderId", referencedColumnName = "orderId")
@@ -23,11 +23,22 @@ public class OrderDetail {
     @Column(name = "price", nullable = false)
     double price;
 
-    public String getId() {
+    @Column(name = "location", nullable = false)
+    String location;
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public int getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(int id) {
         this.id = id;
     }
 

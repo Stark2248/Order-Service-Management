@@ -17,6 +17,9 @@ public class Order {
     @Column(name = "userId", nullable = false)
     private String userId;
 
+    @Column(name = "orderStatus", nullable = false)
+    private String orderStatus;
+
     @Column(name = "totalPrice", nullable = false)
     private double totalPrice;
 
@@ -26,6 +29,13 @@ public class Order {
     @Column(name = "location", nullable = false)
     private String location;
 
+    public String getOrderStatus() {
+        return orderStatus;
+    }
+
+    public void setOrderStatus(String orderStatus) {
+        this.orderStatus = orderStatus;
+    }
 
     public String getOrderId() {
         return orderId;
