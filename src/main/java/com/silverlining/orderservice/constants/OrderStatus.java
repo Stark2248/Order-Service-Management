@@ -1,4 +1,4 @@
-package com.silverlining.orderservice.utils;
+package com.silverlining.orderservice.constants;
 
 import java.util.Objects;
 

@@ -1,8 +1,7 @@
 package com.silverlining.orderservice.service;
 
 import com.silverlining.orderservice.dto.OrderDto;
-import com.silverlining.orderservice.models.Order;
-import com.silverlining.orderservice.utils.OrderStatus;
+import com.silverlining.orderservice.constants.OrderStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -22,6 +21,10 @@ public interface OrderService {
     public LocalDateTime fetchDate(String orderId);
 
     public OrderStatus fetchStatus(String orderId);
+
+    public void updateStatus(String orderId, OrderStatus status);
+
+    public void updateTotalPrice(String orderId, double totalPrice);
 
 
 

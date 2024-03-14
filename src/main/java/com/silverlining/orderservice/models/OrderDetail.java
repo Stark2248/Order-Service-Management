@@ -10,7 +10,7 @@ public class OrderDetail {
     @GeneratedValue(strategy = GenerationType.AUTO)
     int id;
 
-    @OneToMany
+    @ManyToOne
     @JoinColumn(name = "orderId", referencedColumnName = "orderId")
     Order order;
 
