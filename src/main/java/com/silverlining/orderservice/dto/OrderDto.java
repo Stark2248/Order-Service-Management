@@ -13,6 +13,15 @@ public class OrderDto {
 
     private LocalDateTime date;
 
+    private String orderStatus;
+
+    public String getOrderStatus() {
+        return orderStatus;
+    }
+
+    public void setOrderStatus(String orderStatus) {
+        this.orderStatus = orderStatus;
+    }
 
     private String location;
 

@@ -1,38 +1,23 @@
-package com.silverlining.orderservice.models;
+package com.silverlining.orderservice.dto;
 
+import com.silverlining.orderservice.models.Order;
 import jakarta.persistence.*;
 
-@Entity
-@Table(name = "orderdetail")
-public class OrderDetail {
+public class OrderDetailDto {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
     int id;
 
-    @ManyToOne
-    @JoinColumn(name = "orderId", referencedColumnName = "orderId")
+
     Order order;
 
-    @Column(name = "serialId", nullable = false)
+
     String serialId;
 
-    @Column(name = "quantity", nullable = false)
+
     int quantity;
 
-    @Column(name = "price", nullable = false)
+
     double price;
-
-    @Column(name = "location", nullable = false)
-    String location;
-
-    public String getLocation() {
-        return location;
-    }
-
-    public void setLocation(String location) {
-        this.location = location;
-    }
 
     public int getId() {
         return id;
