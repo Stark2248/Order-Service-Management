@@ -1,24 +1,25 @@
 package com.silverlining.orderservice.service;
 
 import com.silverlining.orderservice.constants.OrderStatus;
-import com.silverlining.orderservice.dto.Cart;
-import com.silverlining.orderservice.dto.OrderDetailDto;
-import com.silverlining.orderservice.dto.OrderDto;
-import com.silverlining.orderservice.dto.ProductDto;
+import com.silverlining.orderservice.dto.*;
 import com.silverlining.orderservice.models.Order;
 import com.silverlining.orderservice.models.OrderDetail;
 import com.silverlining.orderservice.repository.OrderDetailsRepository;
+import com.silverlining.orderservice.utils.OrderUtilities;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,7 +47,41 @@ public class OrderDetailsServiceImpl implements OrderDetailsService{
     @Override
     public String placeOrder(List<Cart> cartItems, String userId, String location) {
 
-        String url = "http://USER-WS/users/"+userId;
+        String uri = "http://USER-WS/users/"+userId;
+
+        ResponseEntity<UserDto> responseUser = restTemplate.getForEntity(uri,UserDto.class);
+        if(responseUser.getStatusCode().equals(HttpStatus.NOT_FOUND)){
+            return "User not found";
+        }
+
+        uri ="http://product-ws/warehouse/locations/"+location;
+        ResponseEntity<WarehouseDto> warehouseDtoResponse = restTemplate.getForEntity(uri,WarehouseDto.class);
+
+        if (warehouseDtoResponse.getStatusCode().equals(HttpStatus.NO_CONTENT)){
+            return "no items are available at the moment";
+        }
+        List<WarehouseDto> warehouseDtoLists = Collections.singletonList(warehouseDtoResponse.getBody());
+
+        List<String> serialIds = cartItems.stream().map(item -> item.getSerialId()).collect(Collectors.toList());
+
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<List<String>> entity = new HttpEntity<>(serialIds,httpHeaders);
+        ParameterizedTypeReference<List<ProductDto>> responseType = new ParameterizedTypeReference<List<ProductDto>>() {};
+
+        uri="http://product-ws/products/all";
+        ResponseEntity<List<ProductDto>> responseLists = restTemplate.exchange(uri,HttpMethod.PUT, entity, responseType);
+        if(responseLists.getBody().isEmpty())
+            return "Invalid Product Ids. please check again";
+
+        String valid = validate(cartItems,warehouseDtoLists);
+        if(!valid.equals("Valid")){
+            return valid;
+        }
+
+        List<ProductDto> productDtos = responseLists.getBody();
+        double totalPrice = getTotalPrice(cartItems,productDtos);
 
 
         ModelMapper mapper = new ModelMapper();
@@ -55,64 +90,78 @@ public class OrderDetailsServiceImpl implements OrderDetailsService{
         orderDto.setUserId(userId);
         orderDto.setDate(LocalDateTime.now());
         orderDto.setOrderStatus(OrderStatus.PLACED.name());
-        double totalPrice = getTotalPrice(cartItems,location); // check for -1
         orderDto.setTotalPrice(totalPrice);
         orderDto.setLocation(location);
-        //orderService.save(orderDto);
+        orderService.save(orderDto);
+        Order order = mapper.map(orderDto,Order.class);
         LOGGER.info("Orderid : {{}}",orderDto.getOrderId());
         for(Cart item : cartItems){
             OrderDetailDto orderDetailDto = new OrderDetailDto();
             String serialId=item.getSerialId();
-            String uri = "http://PRODUCT-WS/products/"+serialId;
-            ResponseEntity<ProductDto> responseEntityProduct = restTemplate.getForEntity(uri,ProductDto.class);
-            uri = "http://PRODUCT-WS/warehouse/stock/"+location+"/"+serialId;
-            ProductDto productDto = responseEntityProduct.getBody();
-            if(productDto!=null) {
-                ResponseEntity<Integer> responseEntityQty = restTemplate.getForEntity(uri, Integer.class);
-                if (responseEntityQty.getBody() != null) {
-                    int warehouseQuantity = responseEntityQty.getBody();
-                    if (warehouseQuantity == -1) {
-                        return productDto.getName() + " Product out of stock or not available in the given location.";
-                    }else if(warehouseQuantity < item.getQuantity()){
-                        return productDto.getName() + " Only " + warehouseQuantity + " much available in stock at the moment. Please try getting less or wait until new stocks arrives. Thank you.";
-                    }else{
-                        orderDetailDto.setSerialId(serialId);
-                        orderDetailDto.setPrice(productDto.getPrice()*item.getQuantity());
-                        orderDetailDto.setOrder(mapper.map(orderDto, Order.class));
-                        orderDetailDto.setQuantity(item.getQuantity());
-                        OrderDetail orderDetail =mapper.map(orderDetailDto,OrderDetail.class);
-                        detailsRepository.save(orderDetail);
-                        return OrderStatus.PLACED.name();
-                    }
+
+            orderDetailDto.setOrder(order);
+            orderDetailDto.setQuantity(item.getQuantity());
+            double price = 0;
+            for(ProductDto productDto: productDtos){
+                if(productDto.getSerialId().equals(item.getSerialId())){
+                    price = item.getQuantity()*productDto.getPrice();
                 }
             }
+
+            orderDetailDto.setPrice(price);
+            OrderDetail orderDetail = mapper.map(orderDetailDto,OrderDetail.class);
+
+            WarehouseDto warehouseDto = OrderUtilities.getWarehouseDtoFromList(warehouseDtoLists,item.getSerialId());
+
+            int newQty = warehouseDto.getQuantity() - item.getQuantity();
+
+            HttpHeaders httpHeader2 = new HttpHeaders();
+            httpHeader2.setContentType(MediaType.APPLICATION_JSON);
+
+            warehouseDto.setQuantity(newQty);
+
+            HttpEntity<WarehouseDto> requestEntity = new HttpEntity<>(warehouseDto,httpHeader2);
+
+            uri = "http://product-ws/warehouse/"+location+"/"+item.getSerialId();
+
+            restTemplate.put(uri,requestEntity);
+
+            detailsRepository.save(orderDetail);
         }
-        return "unsuccesful";
+        return OrderStatus.PLACED.name();
     }
 
-    private double getTotalPrice(List<Cart> cart, String location){
+    private static String validate(List<Cart> items, List<WarehouseDto> warehouseDtoList){
+        List<String> serialIds = items.stream().map(item -> item.getSerialId()).collect(Collectors.toList());
+
+        Map<String, Integer> serialQtyMap = items.stream().collect(Collectors.toMap(k -> k.getSerialId(), v -> v.getQuantity()));
+
+        for(String serial : serialIds){
+            WarehouseDto dto = OrderUtilities.getWarehouseDtoFromList(warehouseDtoList,serial);
+            if(dto == null){
+                return "productId:"+serial+" not found in the warehouse";
+            }
+            if(serialQtyMap.get(serial)>dto.getQuantity()){
+                return dto.getName()+" Only "+dto.getQuantity()+" much available in stock at the moment. Please try getting less or wait until new stocks arrives. Thank you";
+            }
+            if(dto.getQuantity() == 0){
+                return dto.getName()+" is out of stock. try from different location.";
+            }
+        }
+        return "Valid";
+    }
+
+    private double getTotalPrice(List<Cart> cart, List<ProductDto> productDtos){
         double totalPrice = 0;
 
-        List<String> serialIds = cart.stream().map(item -> item.getSerialId()).collect(Collectors.toList());
+        //List<String> serialIds = cart.stream().map(item -> item.getSerialId()).collect(Collectors.toList());
         Map<String, Integer> serialQtyMap = cart.stream().collect(Collectors.toMap(k -> k.getSerialId(), v -> v.getQuantity()));
-        for(Cart item: cart){
-            String serialId=item.getSerialId();
-            String uri = "http://PRODUCT-WS/products/"+serialId;
-            ResponseEntity<ProductDto> responseEntityProduct = restTemplate.getForEntity(uri,ProductDto.class);
-            uri = "http://PRODUCT-WS/warehouse/stock/"+location+"/"+serialId;
-            ProductDto productDto = responseEntityProduct.getBody();
-            if(productDto!=null) {
-                ResponseEntity<Integer> responseEntityQty = restTemplate.getForEntity(uri, Integer.class);
-                if (responseEntityQty.getBody() != null) {
-                    int warehouseQuantity = responseEntityQty.getBody();
-                    if (warehouseQuantity == -1) {
-                        return -1;
-                    }else if(warehouseQuantity < item.getQuantity()){
-                        return -1;
-                    }else{
-                        totalPrice+=(productDto.getPrice()*item.getQuantity());
-                    }
-                }
+        double totalprice = 0;
+        int qty;
+        for(ProductDto productDto: productDtos){
+            if(serialQtyMap.containsKey(productDto.getSerialId())){
+                qty = serialQtyMap.get(productDto.getSerialId());
+                totalprice = totalprice + (qty * productDto.getPrice());
             }
         }
         return totalPrice;
