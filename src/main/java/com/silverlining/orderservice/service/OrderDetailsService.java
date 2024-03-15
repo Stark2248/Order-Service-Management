@@ -3,12 +3,15 @@ package com.silverlining.orderservice.service;
 import com.silverlining.orderservice.dto.Cart;
 import com.silverlining.orderservice.dto.OrderDetailDto;
 import com.silverlining.orderservice.dto.ProductDto;
+import com.silverlining.orderservice.dto.UserDto;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public interface OrderDetailsService {
+
+    public UserDto getUser(String userId);
 
     public String placeOrder(List<Cart> cart,String userId, String location);
 

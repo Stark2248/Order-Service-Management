@@ -43,24 +43,36 @@ public class OrderDetailsServiceImpl implements OrderDetailsService{
     }
 
 
+    @Override
+    public UserDto getUser(String userId) {
+        String uri = "http://USER-WS/user-management/users/"+userId;
+
+        ResponseEntity<UserDto> responseUser = restTemplate.getForEntity(uri,UserDto.class);
+        if(responseUser.getStatusCode().equals(HttpStatus.NOT_FOUND)){
+            return null;
+        }
+
+        return responseUser.getBody();
+    }
+
     @Transactional
     @Override
     public String placeOrder(List<Cart> cartItems, String userId, String location) {
 
-        String uri = "http://USER-WS/users/"+userId;
+        String uri = "http://USER-WS/user-management/users/"+userId;
 
         ResponseEntity<UserDto> responseUser = restTemplate.getForEntity(uri,UserDto.class);
         if(responseUser.getStatusCode().equals(HttpStatus.NOT_FOUND)){
             return "User not found";
         }
-
+        ParameterizedTypeReference<List<WarehouseDto>> responseType2 = new ParameterizedTypeReference<List<WarehouseDto>>() {};
         uri ="http://product-ws/warehouse/locations/"+location;
-        ResponseEntity<WarehouseDto> warehouseDtoResponse = restTemplate.getForEntity(uri,WarehouseDto.class);
+        ResponseEntity<List<WarehouseDto>> warehouseDtoResponse = restTemplate.exchange(uri,HttpMethod.GET,null,responseType2);
 
         if (warehouseDtoResponse.getStatusCode().equals(HttpStatus.NO_CONTENT)){
             return "no items are available at the moment";
         }
-        List<WarehouseDto> warehouseDtoLists = Collections.singletonList(warehouseDtoResponse.getBody());
+        List<WarehouseDto> warehouseDtoLists = warehouseDtoResponse.getBody();
 
         List<String> serialIds = cartItems.stream().map(item -> item.getSerialId()).collect(Collectors.toList());
 
@@ -71,7 +83,7 @@ public class OrderDetailsServiceImpl implements OrderDetailsService{
         ParameterizedTypeReference<List<ProductDto>> responseType = new ParameterizedTypeReference<List<ProductDto>>() {};
 
         uri="http://product-ws/products/all";
-        ResponseEntity<List<ProductDto>> responseLists = restTemplate.exchange(uri,HttpMethod.PUT, entity, responseType);
+        ResponseEntity<List<ProductDto>> responseLists = restTemplate.exchange(uri,HttpMethod.POST, entity, responseType);
         if(responseLists.getBody().isEmpty())
             return "Invalid Product Ids. please check again";
 
@@ -169,16 +181,51 @@ public class OrderDetailsServiceImpl implements OrderDetailsService{
 
     @Override
     public List<ProductDto> fetchProducts() {
-        return null;
+        ParameterizedTypeReference<List<ProductDto>> responseType = new ParameterizedTypeReference<List<ProductDto>>() {};
+        String uri="http://product-ws/products/all";
+        ResponseEntity<List<ProductDto>> responseLists = restTemplate.exchange(uri,HttpMethod.GET, null, responseType);
+        if(responseLists.getStatusCode().equals(HttpStatus.NO_CONTENT))
+            return Collections.emptyList();
+        return responseLists.getBody();
     }
 
     @Override
     public List<ProductDto> fetchProductByLocation(String location) {
-        return null;
+        ParameterizedTypeReference<List<WarehouseDto>> responseType2 = new ParameterizedTypeReference<List<WarehouseDto>>() {};
+        String uri ="http://product-ws/warehouse/locations/"+location;
+        ResponseEntity<List<WarehouseDto>> warehouseDtoResponse = restTemplate.exchange(uri,HttpMethod.GET,null,responseType2);
+        ParameterizedTypeReference<List<ProductDto>> responseType = new ParameterizedTypeReference<List<ProductDto>>() {};
+        uri = "http://product-ws/products/all";
+        ResponseEntity<List<ProductDto>> responseLists = restTemplate.exchange(uri,HttpMethod.GET, null, responseType);
+        if(responseLists.getStatusCode().equals(HttpStatus.NO_CONTENT))
+            return Collections.emptyList();
+
+        List<ProductDto> productDtoList = new ArrayList<>();
+        for(ProductDto productDto : responseLists.getBody()){
+            WarehouseDto warehouseDto = OrderUtilities.getWarehouseDtoFromList(warehouseDtoResponse.getBody(),productDto.getSerialId());
+            if(warehouseDto != null){
+                productDtoList.add(productDto);
+            }
+        }
+
+        if(!productDtoList.isEmpty()){
+            return productDtoList;
+        }
+        return Collections.emptyList();
     }
 
     @Override
     public List<OrderDetailDto> fetchOrderDetailsByOrderId(String orderId) {
-        return null;
+        ModelMapper mapper = new ModelMapper();
+        mapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
+        List<OrderDetail> orderDetails = detailsRepository.findByOrderId(orderId);
+        if(!orderDetails.isEmpty()){
+            List<OrderDetailDto> dtoList = new ArrayList<>();
+            for(OrderDetail orderDetail : orderDetails){
+                dtoList.add(mapper.map(orderDetail,OrderDetailDto.class));
+            }
+            return dtoList;
+        }
+        return Collections.emptyList();
     }
 }
