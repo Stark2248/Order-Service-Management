@@ -15,6 +15,10 @@ public class OrderDto {
 
     private String orderStatus;
 
+
+
+    private String location;
+
     public String getOrderStatus() {
         return orderStatus;
     }
@@ -22,8 +26,6 @@ public class OrderDto {
     public void setOrderStatus(String orderStatus) {
         this.orderStatus = orderStatus;
     }
-
-    private String location;
 
     public String getOrderId() {
         return orderId;
