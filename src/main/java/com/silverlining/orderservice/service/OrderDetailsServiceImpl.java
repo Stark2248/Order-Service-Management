@@ -21,13 +21,12 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.silverlining.orderservice.constants.OrderContants.*;
+
 @Component
 public class OrderDetailsServiceImpl implements OrderDetailsService{
 
     private static final Logger LOGGER = LogManager.getLogger(OrderDetailsServiceImpl.class);
-    public static final String PRODUCTS_ALL_URL = "http://product-ws/products/all";
-    public static final String WAREHOUSE_URL = "http://product-ws/warehouse/";
-    public static final String VALID = "Valid";
 
     OrderService orderService;
 
@@ -100,23 +99,28 @@ public class OrderDetailsServiceImpl implements OrderDetailsService{
         return order.getOrderStatus();
     }
 
+    private static OrderDetailDto getOrderDetailDto(Order order, List<ProductDto> productDtos, Cart item) {
+        OrderDetailDto orderDetailDto = new OrderDetailDto();
+        String serialId = item.getSerialId();
+        orderDetailDto.setSerialId(serialId);
+
+        orderDetailDto.setOrder(order);
+        orderDetailDto.setQuantity(item.getQuantity());
+        double price = 0;
+        for (ProductDto productDto : productDtos) {
+            if (productDto.getSerialId().equals(item.getSerialId())) {
+                price = item.getQuantity() * productDto.getPrice();
+            }
+        }
+
+        orderDetailDto.setPrice(price);
+        return orderDetailDto;
+    }
+
     private void updateWarehouseAndSaveOrderDetails(List<Cart> cartItems, String location, Order order, List<ProductDto> productDtos, ModelMapper mapper, List<WarehouseDto> warehouseDtoList) {
         try {
             for (Cart item : cartItems) {
-                OrderDetailDto orderDetailDto = new OrderDetailDto();
-                String serialId = item.getSerialId();
-                orderDetailDto.setSerialId(serialId);
-
-                orderDetailDto.setOrder(order);
-                orderDetailDto.setQuantity(item.getQuantity());
-                double price = 0;
-                for (ProductDto productDto : productDtos) {
-                    if (productDto.getSerialId().equals(item.getSerialId())) {
-                        price = item.getQuantity() * productDto.getPrice();
-                    }
-                }
-
-                orderDetailDto.setPrice(price);
+                OrderDetailDto orderDetailDto = getOrderDetailDto(order, productDtos, item);
                 OrderDetail orderDetail = mapper.map(orderDetailDto, OrderDetail.class);
 
                 Optional<WarehouseDto> optionalWarehouseDto = OrderUtilities.getWarehouseDtoFromList(warehouseDtoList, item.getSerialId());

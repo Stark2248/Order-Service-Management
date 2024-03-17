@@ -1,15 +1,12 @@
 package com.silverlining.orderservice.controllers;
 
 import com.silverlining.orderservice.constants.OrderStatus;
-import com.silverlining.orderservice.dto.Cart;
-import com.silverlining.orderservice.dto.OrderDto;
-import com.silverlining.orderservice.dto.ProductDto;
-import com.silverlining.orderservice.dto.UserDto;
+import com.silverlining.orderservice.dto.*;
+import com.silverlining.orderservice.httpmodels.OrderDetailResponseModel;
 import com.silverlining.orderservice.httpmodels.OrderRequestModel;
 import com.silverlining.orderservice.httpmodels.ProductResponseModel;
 import com.silverlining.orderservice.httpmodels.UserResponseModel;
 import com.silverlining.orderservice.service.OrderDetailsService;
-import com.silverlining.orderservice.service.OrderDetailsServiceImpl;
 import com.silverlining.orderservice.service.OrderService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -36,6 +33,42 @@ public class OrderServiceController {
     public OrderServiceController(OrderDetailsService orderDetailsService, OrderService orderService){
         this.orderDetailsService = orderDetailsService;
         this.orderService = orderService;
+    }
+
+
+    private static List<OrderDetailResponseModel> getOrderDetailsResponseModels(String orderId, List<OrderDetailDto> dtoList, List<ProductDto> productDtos) {
+        List<OrderDetailResponseModel> responseModelList = new ArrayList<>();
+        String name = "-";
+        for (OrderDetailDto dto : dtoList) {
+            for (ProductDto productDto : productDtos) {
+                if (productDto.getSerialId().equals(dto.getSerialId())) {
+                    name = productDto.getName();
+                }
+            }
+            OrderDetailResponseModel responseModel = new OrderDetailResponseModel();
+            responseModel.setOrderId(orderId);
+            responseModel.setName(name);
+            responseModel.setPrice(dto.getPrice());
+            responseModel.setQuantity(dto.getQuantity());
+            responseModel.setSerialId(dto.getSerialId());
+            responseModelList.add(responseModel);
+        }
+        return responseModelList;
+    }
+
+    @GetMapping("{userId}/orders/orderdetails/{orderId}")
+    public ResponseEntity<List<OrderDetailResponseModel>> getOrderDetails(@PathVariable(name = "userId") String userId, @PathVariable(name = "orderId") String orderId) {
+        Optional<UserDto> optionalUserDto = orderDetailsService.getUser(userId);
+        if (optionalUserDto.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        List<OrderDetailDto> dtoList = orderDetailsService.fetchOrderDetailsByOrderId(orderId);
+        if (dtoList.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).body(null);
+        }
+        List<ProductDto> productDtos = orderDetailsService.fetchProducts();
+        List<OrderDetailResponseModel> responseModelList = getOrderDetailsResponseModels(orderId, dtoList, productDtos);
+        return ResponseEntity.status(HttpStatus.OK).body(responseModelList);
     }
 
     @GetMapping("{userId}")
