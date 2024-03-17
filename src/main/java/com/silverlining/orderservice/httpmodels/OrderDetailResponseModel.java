@@ -1,6 +1,6 @@
 package com.silverlining.orderservice.httpmodels;
 
-public class OrderDetialResponseModel {
+public class OrderDetailResponseModel {
     String orderId;
     String serialId;
 

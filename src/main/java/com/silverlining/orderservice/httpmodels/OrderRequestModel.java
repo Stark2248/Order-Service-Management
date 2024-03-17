@@ -1,6 +1,6 @@
-package com.silverlining.orderservice.dto;
+package com.silverlining.orderservice.httpmodels;
 
-public class Cart {
+public class OrderRequestModel {
     String serialId;
     int quantity;
 
@@ -22,7 +22,7 @@ public class Cart {
 
     @Override
     public String toString() {
-        return "Cart{" +
+        return "OrderRequestModel{" +
                 "serialId='" + serialId + '\'' +
                 ", quantity=" + quantity +
                 '}';
