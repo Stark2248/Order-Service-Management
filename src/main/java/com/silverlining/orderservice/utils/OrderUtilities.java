@@ -1,13 +1,13 @@
 package com.silverlining.orderservice.utils;
 
 import com.silverlining.orderservice.dto.OrderDto;
-import com.silverlining.orderservice.dto.ProductDto;
 import com.silverlining.orderservice.dto.WarehouseDto;
 import com.silverlining.orderservice.models.Order;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
 
 import java.util.List;
+import java.util.Optional;
 
 public class OrderUtilities {
 
@@ -17,13 +17,8 @@ public class OrderUtilities {
         return mapper.map(order,OrderDto.class);
     }
 
-    public static WarehouseDto getWarehouseDtoFromList(List<WarehouseDto> dtoList, String serialId){
-        for(WarehouseDto dto : dtoList){
-            if(dto.getSerialId().equals(serialId)){
-                return dto;
-            }
-        }
-        return null;
+    public static Optional<WarehouseDto> getWarehouseDtoFromList(List<WarehouseDto> dtoList, String serialId){
+        return dtoList.stream().filter(dto -> dto.getSerialId().equalsIgnoreCase(serialId)).findFirst();
     }
 
 }

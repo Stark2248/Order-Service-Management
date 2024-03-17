@@ -2,7 +2,7 @@ package com.silverlining.orderservice.httpmodels;
 
 public class OrderRequestModel {
     String serialId;
-    int qty;
+    int quantity;
 
     public String getSerialId() {
         return serialId;
@@ -12,11 +12,19 @@ public class OrderRequestModel {
         this.serialId = serialId;
     }
 
-    public int getQty() {
-        return qty;
+    public int getQuantity() {
+        return quantity;
     }
 
-    public void setQty(int qty) {
-        this.qty = qty;
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    @Override
+    public String toString() {
+        return "OrderRequestModel{" +
+                "serialId='" + serialId + '\'' +
+                ", quantity=" + quantity +
+                '}';
     }
 }

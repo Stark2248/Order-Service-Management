@@ -7,17 +7,18 @@ import com.silverlining.orderservice.dto.UserDto;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public interface OrderDetailsService {
 
-    public UserDto getUser(String userId);
+    public Optional<UserDto> getUser(String userId);
 
     public String placeOrder(List<Cart> cart,String userId, String location);
 
     public List<ProductDto> fetchProducts();
 
-    public List<ProductDto> fetchProductByLocation(String location);
+    public Optional<List<ProductDto>> fetchProductByLocation(String location);
 
     public List<OrderDetailDto> fetchOrderDetailsByOrderId(String orderId);
 

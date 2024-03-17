@@ -7,6 +7,7 @@ public enum OrderStatus {
     DELIVERED("DLVR"),
     CANCELLED("CNCL"),
     PLACED("PLCD"),
+    ERROR("ERR"),
     SHIPPED("SHPD");
 
 

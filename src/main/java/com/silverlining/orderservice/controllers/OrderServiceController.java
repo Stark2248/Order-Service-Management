@@ -9,7 +9,10 @@ import com.silverlining.orderservice.httpmodels.OrderRequestModel;
 import com.silverlining.orderservice.httpmodels.ProductResponseModel;
 import com.silverlining.orderservice.httpmodels.UserResponseModel;
 import com.silverlining.orderservice.service.OrderDetailsService;
+import com.silverlining.orderservice.service.OrderDetailsServiceImpl;
 import com.silverlining.orderservice.service.OrderService;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,9 +23,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 public class OrderServiceController {
+    private static final Logger LOGGER = LogManager.getLogger(OrderServiceController.class);
 
     OrderDetailsService orderDetailsService;
     OrderService orderService;
@@ -35,10 +40,11 @@ public class OrderServiceController {
 
     @GetMapping("{userId}")
     public ResponseEntity<?> getUserDetails(@PathVariable(name = "userId") String userId){
-        UserDto userDto = orderDetailsService.getUser(userId);
-        if(userDto == null){
+        Optional<UserDto> optionalUserDto = orderDetailsService.getUser(userId);
+        if(optionalUserDto.isEmpty()){
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No user present with user id "+userId);
         }
+        UserDto userDto = optionalUserDto.get();
         UserResponseModel responseModel = new UserResponseModel();
         responseModel.setUserId(userDto.getId());
         responseModel.setFirstName(userDto.getFirstName());
@@ -54,27 +60,31 @@ public class OrderServiceController {
 
     @GetMapping("{userId}/browse/{location}")
     public ResponseEntity<List<ProductResponseModel>> getProductByLoaction(@PathVariable(name = "userId") String userId, @PathVariable(name = "location") String location){
-        UserDto userDto = orderDetailsService.getUser(userId);
-        if(userDto == null){
+        Optional<UserDto> optionalUserDto = orderDetailsService.getUser(userId);
+        if(optionalUserDto.isEmpty()){
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
-        List<ProductDto> productDtos = orderDetailsService.fetchProductByLocation(location);
+        Optional<List<ProductDto>> optionalProductDtos = orderDetailsService.fetchProductByLocation(location);
+        List<ProductDto> productDtos = optionalProductDtos.get();
         ModelMapper mapper = new ModelMapper();
         mapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
-        List<ProductResponseModel> responseModelList = new ArrayList<>();
-        responseModelList = productDtos.stream().map(productDto -> mapper.map(productDto,ProductResponseModel.class)).toList();
+        List<ProductResponseModel> responseModelList = productDtos.stream().map(productDto -> mapper.map(productDto,ProductResponseModel.class)).toList();
 
         return ResponseEntity.status(HttpStatus.FOUND).body(responseModelList);
     }
 
     @PostMapping("{userId}/order/{location}")
-    public ResponseEntity<?> orderItems(@PathVariable("userId") String userId, @PathVariable(name = "location") String location, @RequestBody List<OrderRequestModel> itemrequests){
+    public ResponseEntity<?> orderItems(@PathVariable("userId") String userId,
+                                        @PathVariable(name = "location") String location,
+                                        @RequestBody List<OrderRequestModel> itemrequests){
         List<Cart> cartItems  = new ArrayList<>();
         ModelMapper mapper = new ModelMapper();
         mapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
         for(OrderRequestModel requestModel: itemrequests){
             cartItems.add(mapper.map(requestModel,Cart.class));
         }
+        LOGGER.info("itemrequests: {{}} cartItems:{{}}", itemrequests,cartItems);
+
         String validation = orderDetailsService.placeOrder(cartItems,userId,location);
         if(validation.equals(OrderStatus.PLACED.name())){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(validation);

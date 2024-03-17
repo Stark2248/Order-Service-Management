@@ -25,22 +25,32 @@ public class OrderServiceImpl implements OrderService{
     }
 
     @Override
-    public void save(OrderDto order) {
+    public Order createOrder(OrderDto order) {
         Order od = new Order();
         if(StringUtils.isEmpty(order.getOrderId())){
             String id = UUID.randomUUID().toString();
             order.setOrderId(id);
             od.setOrderId(id);
         }
+
         od.setUserId(order.getUserId());
         od.setTotalPrice(order.getTotalPrice());
         od.setDate(order.getDate());
         od.setLocation(order.getLocation());
         od.setOrderStatus(order.getOrderStatus());
 
-        orderRepository.save(od);
+        return orderRepository.saveAndFlush(od);
+
+
 
     }
+    @Override
+    public Order saveOrder(Order order) {
+        return orderRepository.saveAndFlush(order);
+
+    }
+
+
 
     @Override
     public OrderDto fetch(String orderId) {
@@ -60,7 +70,7 @@ public class OrderServiceImpl implements OrderService{
 
     @Override
     public List<OrderDto> fetchUserOrders(String userId) {
-        List<OrderDto> dtoList =  orderRepository.findUserId(userId).stream().map(OrderUtilities::getOrderDto).toList();
+        List<OrderDto> dtoList =  orderRepository.findByUserId(userId).stream().map(OrderUtilities::getOrderDto).toList();
         if(!dtoList.isEmpty())
             return dtoList;
         return Collections.emptyList();
